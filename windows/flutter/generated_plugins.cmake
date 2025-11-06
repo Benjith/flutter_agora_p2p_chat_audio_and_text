@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_windows
   flutter_localization
   iris_method_channel
+  permission_handler_windows
   record_windows
 )
 
