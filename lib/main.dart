@@ -3,15 +3,15 @@ import 'package:agora_chat_uikit/chat_uikit.dart';
 import 'package:agora_chat_callkit/agora_chat_callkit.dart';
 
 const String appKey = "";
+const String agoraAppId = "";
 const String userId = '';
-const String token = "";
+const String token =
+    "";
 
 void main() {
   ChatUIKit.instance
       .init(options: Options(appKey: appKey, autoLogin: false))
       .then((value) {
-        // Initialize CallKit
-
         runApp(MyApp());
       });
 }
@@ -33,7 +33,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       builder: (context, child) {
-        return ChatCallKit(agoraAppId: appKey, child: child!);
+        return ChatCallKit(agoraAppId: agoraAppId, child: child!);
       },
       home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
@@ -173,7 +173,23 @@ class _ChatPageState extends State<ChatPage> {
         title: Text(widget.chatterId),
         actions: [
           // Voice Call Button
-          IconButton(icon: const Icon(Icons.videocam), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.videocam),
+            onPressed: () async {
+              await ChatCallKitManager.initRTC();
+              try {
+                // userId: The Agora Chat user ID of the callee.
+                // type: The call type, which can be `ChatCallKitCallType.audio_1v1` or `ChatCallKitCallType.video_1v1`.
+                String callId = await ChatCallKitManager.startSingleCall(
+                  userId,
+                  type: ChatCallKitCallType.audio_1v1,
+                );
+              } on ChatCallKitError catch (e) {
+                print(e.errDescription);
+                debugPrint('Error starting call: ${e.toString()}');
+              }
+            },
+          ),
         ],
       ),
       body: MessagesView(
