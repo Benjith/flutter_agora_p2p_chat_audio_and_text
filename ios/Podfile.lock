@@ -1,10 +1,12 @@
 PODS:
+  - agora_chat_callkit (0.0.1):
+    - Flutter
   - agora_chat_sdk (0.0.1):
     - Flutter
     - HyphenateChat (= 4.10.2)
   - agora_chat_uikit (0.0.1):
     - Flutter
-  - agora_rtc_engine (6.5.3):
+  - agora_rtc_engine (6.5.2):
     - AgoraIrisRTC_iOS (= 4.5.2-build.1)
     - AgoraRtcEngine_iOS (= 4.5.2)
     - Flutter
@@ -134,6 +136,7 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
+  - agora_chat_callkit (from `.symlinks/plugins/agora_chat_callkit/ios`)
   - agora_chat_sdk (from `.symlinks/plugins/agora_chat_sdk/ios`)
   - agora_chat_uikit (from `.symlinks/plugins/agora_chat_uikit/ios`)
   - agora_rtc_engine (from `.symlinks/plugins/agora_rtc_engine/ios`)
@@ -165,6 +168,8 @@ SPEC REPOS:
     - SwiftyGif
 
 EXTERNAL SOURCES:
+  agora_chat_callkit:
+    :path: ".symlinks/plugins/agora_chat_callkit/ios"
   agora_chat_sdk:
     :path: ".symlinks/plugins/agora_chat_sdk/ios"
   agora_chat_uikit:
@@ -201,9 +206,10 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/video_player_avfoundation/darwin"
 
 SPEC CHECKSUMS:
+  agora_chat_callkit: 0ae29a0d2c120ee64132940d6926fc539eeb164d
   agora_chat_sdk: 27ce409bc9c3608b02f0e1a1f135610113f3f022
   agora_chat_uikit: 84000743f5e520d9840936462ff6c7075f728c4e
-  agora_rtc_engine: da45ea14c402317c9e22fdb9ffe504d9a1acbe68
+  agora_rtc_engine: 55723c1e997b9f1d423d4a07dd8d9ec437a1eb89
   AgoraInfra_iOS: 3691b2b277a1712a35ae96de25af319de0d73d08
   AgoraIrisRTC_iOS: eab58c126439adf5ec99632828a558ea216860da
   AgoraRtcEngine_iOS: 97e2398a2addda9057815a2a583a658e36796ff6
