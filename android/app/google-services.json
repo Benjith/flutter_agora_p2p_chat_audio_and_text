@@ -1,0 +1,190 @@
+{
+  "project_info": {
+    "project_number": "1040816516698",
+    "project_id": "pitch-909ed",
+    "storage_bucket": "pitch-909ed.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1040816516698:android:fe31a6b2810b78b42f7263",
+        "android_client_info": {
+          "package_name": "com.example.p2p_chat_with_agora_ui_kit"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfz3Gful7YvrmBRAymqMB_9SpMr351QnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1040816516698-i0eondij3gk3t95a6psdeoslo2ei0puv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zoondia.pitch"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1040816516698:android:a62812349a2594102f7263",
+        "android_client_info": {
+          "package_name": "com.pitch.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfz3Gful7YvrmBRAymqMB_9SpMr351QnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1040816516698-i0eondij3gk3t95a6psdeoslo2ei0puv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zoondia.pitch"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1040816516698:android:eb3c019057aac19d2f7263",
+        "android_client_info": {
+          "package_name": "com.pitch.app.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfz3Gful7YvrmBRAymqMB_9SpMr351QnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1040816516698-i0eondij3gk3t95a6psdeoslo2ei0puv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zoondia.pitch"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1040816516698:android:9d06d199f79e0be32f7263",
+        "android_client_info": {
+          "package_name": "com.pitch.app.pitch"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfz3Gful7YvrmBRAymqMB_9SpMr351QnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1040816516698-i0eondij3gk3t95a6psdeoslo2ei0puv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zoondia.pitch"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1040816516698:android:8379382ad8f7f3182f7263",
+        "android_client_info": {
+          "package_name": "com.pitch.app.stg"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfz3Gful7YvrmBRAymqMB_9SpMr351QnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1040816516698-i0d7038h2v99vvnn87h7om1g9cpue046.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1040816516698-i0eondij3gk3t95a6psdeoslo2ei0puv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zoondia.pitch"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

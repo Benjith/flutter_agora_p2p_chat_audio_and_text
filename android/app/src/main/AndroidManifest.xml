@@ -34,6 +34,19 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+              <meta-data
+    android:name="EASEM_PUSH_VIVO"
+    android:value="false" />
+<meta-data
+    android:name="EASEM_PUSH_OPPO"
+    android:value="false" />
+<meta-data
+    android:name="EASEM_PUSH_MEIZU"
+    android:value="false" />
+<meta-data
+    android:name="EASEM_PUSH_XIAOMI"
+    android:value="false" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

@@ -9,6 +9,7 @@
 #include <agora_rtc_engine/agora_rtc_engine_plugin.h>
 #include <audioplayers_windows/audioplayers_windows_plugin.h>
 #include <file_selector_windows/file_selector_windows.h>
+#include <firebase_core/firebase_core_plugin_c_api.h>
 #include <flutter_localization/flutter_localization_plugin_c_api.h>
 #include <iris_method_channel/iris_method_channel_plugin_c_api.h>
 #include <permission_handler_windows/permission_handler_windows_plugin.h>
@@ -21,6 +22,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("AudioplayersWindowsPlugin"));
   FileSelectorWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FileSelectorWindows"));
+  FirebaseCorePluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FirebaseCorePluginCApi"));
   FlutterLocalizationPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterLocalizationPluginCApi"));
   IrisMethodChannelPluginCApiRegisterWithRegistrar(

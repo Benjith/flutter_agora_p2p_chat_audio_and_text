@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   agora_rtc_engine
   audioplayers_windows
   file_selector_windows
+  firebase_core
   flutter_localization
   iris_method_channel
   permission_handler_windows

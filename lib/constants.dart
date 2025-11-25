@@ -1,10 +1,7 @@
 const String appKey = "";
 const String agoraAppId = "";
 
-const String channelId = "";
-const String tempToken = "";
-
-const List<Map<String, String>> staticUsers = [
-  {"id": '', "token": "", "channelToken": ""},
-  {"id": '', "token": "", "channelToken": ""},
-];
+// Replace with your actual backend URL.
+// If using Android Emulator, use 'http://10.0.2.2:8000'
+// If using iOS Simulator or real device, use your machine's IP address, e.g., 'http://192.168.1.6:8000'
+const String apiBaseUrl = "http://0000.000.0.0:8000";
