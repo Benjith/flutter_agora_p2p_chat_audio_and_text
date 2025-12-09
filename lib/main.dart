@@ -10,8 +10,13 @@ import 'package:p2p_chat_with_agora_ui_kit/firebase_options.dart';
 import 'package:agora_chat_callkit/agora_chat_callkit.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:p2p_chat_with_agora_ui_kit/token_service.dart';
+import 'package:p2p_chat_with_agora_ui_kit/chat_state.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:agora_chat_sdk/agora_chat_sdk.dart' as agora_sdk;
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -23,6 +28,71 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   debugPrint("Handling background message: ${message.messageId}");
   debugPrint("Background message data: ${message.data}");
+
+  // If it is a call and app is in background (terminated handler)
+  if (message.data.containsKey("callId")) {
+    // We can try to show CallKit here if the plugin allows being called from BG handler
+    // Note: On Android, this might work directly. On iOS, typically needs PushKit.
+    // But let's try to handle standard notification triggers.
+    final String fromUserId = message.data["f"];
+    final String fromUserName = message.data["u"] ?? fromUserId;
+    final String callId = message.data["callId"];
+    final bool isVideo = message.data["callType"] == "video";
+
+    await _showCallKitIncomingStatic(fromUserId, fromUserName, callId, isVideo);
+  }
+}
+
+Future<void> _showCallKitIncomingStatic(
+  String callerId,
+  String callerName,
+  String callId,
+  bool isVideo,
+) async {
+  final params = CallKitParams(
+    id: callId,
+    nameCaller: callerName,
+    appName: 'P2P Chat',
+    avatar: 'https://i.pravatar.cc/100',
+    handle: callerId,
+    type: isVideo ? 1 : 0,
+    duration: 30000,
+    textAccept: 'Accept',
+    textDecline: 'Decline',
+    missedCallNotification: const NotificationParams(
+      showNotification: true,
+      isShowCallback: true,
+      subtitle: 'Missed call',
+      callbackText: 'Call back',
+    ),
+    extra: <String, dynamic>{'userId': callerId, 'callType': isVideo ? 1 : 0},
+    headers: <String, dynamic>{'apiKey': 'Abc@123!', 'platform': 'flutter'},
+    android: const AndroidParams(
+      isCustomNotification: true,
+      isShowLogo: false,
+      ringtonePath: 'system_ringtone_default',
+      backgroundColor: '#0955fa',
+      backgroundUrl: 'https://i.pravatar.cc/500',
+      actionColor: '#4CAF50',
+    ),
+    ios: const IOSParams(
+      iconName: 'AppIcon',
+      handleType: '',
+      supportsVideo: true,
+      maximumCallGroups: 2,
+      maximumCallsPerCallGroup: 1,
+      audioSessionMode: 'default',
+      audioSessionActive: true,
+      audioSessionPreferredSampleRate: 44100.0,
+      audioSessionPreferredIOBufferDuration: 0.005,
+      supportsDTMF: true,
+      supportsHolding: true,
+      supportsGrouping: false,
+      supportsUngrouping: false,
+      ringtonePath: 'system_ringtone_default',
+    ),
+  );
+  await FlutterCallkitIncoming.showCallkitIncoming(params);
 }
 
 void main() async {
@@ -73,16 +143,83 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   bool _isLoggedIn = false;
   final TextEditingController _userIdController = TextEditingController();
   bool _isLoading = false;
+  AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
+  String? _pendingNavigationUserId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _setupFCMListeners();
     _setupLocalNotifications();
+    _checkAutoLogin();
+    _checkIncomingCallEvents();
+  }
+
+  Future<void> _checkIncomingCallEvents() async {
+    try {
+      final calls = await FlutterCallkitIncoming.activeCalls();
+      if (calls is List) {
+        for (var call in calls) {
+          debugPrint("Active call found on startup: ${call['id']}");
+          // We could potentially navigate here if we know it was accepted
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking incoming call events: $e");
+    }
+  }
+
+  void _handleCallKitEvent(CallEvent event) {
+    switch (event.event) {
+      case Event.actionCallAccept:
+        debugPrint("Call Accepted: ${event.body}");
+        final extra = event.body['extra'];
+        if (extra != null) {
+          final String userId = extra['userId'];
+          final int callTypeInt = extra['callType'] ?? 0;
+          final callType = callTypeInt == 1
+              ? AgoraChatCallType.video_1v1
+              : AgoraChatCallType.audio_1v1;
+
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (_) => SingleCallPage.call(userId, type: callType),
+            ),
+          );
+        }
+        break;
+      case Event.actionCallDecline:
+        debugPrint("Call Declined (Handler)");
+        final callId = event.body['id'] as String?;
+        if (callId != null) {
+          AgoraChatCallManager.hangup(callId);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /// Automatically login if a user ID is saved in shared preferences.
+  Future<void> _checkAutoLogin() async {
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final String? userId = prefs.getString('current_user_id');
+
+    debugPrint("Checking auto-login. Saved ID: $userId");
+
+    if (userId != null && userId.isNotEmpty) {
+      _userIdController.text = userId;
+      // Trigger login automatically
+      await login();
+    } else {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _setupLocalNotifications() async {
@@ -108,18 +245,40 @@ class _MyHomePageState extends State<MyHomePage> {
         if (response.payload != null) {
           // Handle notification tap
           debugPrint("Notification tapped with payload: ${response.payload}");
-          // Navigate to chat page
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (_) => ChatPage(
-                userId: response.payload!,
-                username: response.payload!,
-              ),
-            ),
-          );
+
+          if (_isLoggedIn) {
+            _navigateToChat(response.payload!, response.payload!);
+          } else {
+            debugPrint("Notification tapped but not logged in. Queueing.");
+            _pendingNavigationUserId = response.payload;
+          }
         }
       },
     );
+
+    // Explicitly request permissions for iOS and debug status
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      final status = await Permission.notification.status;
+      debugPrint("Current iOS Notification Permission Status: $status");
+      if (status.isDenied || status.isRestricted) {
+        final result = await Permission.notification.request();
+        debugPrint("Requested iOS Notification Permission: $result");
+      }
+
+      // Also try the plugin's native request method check
+      final bool? result = await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >()
+          ?.requestPermissions(alert: true, badge: true, sound: true);
+      debugPrint("Plugin native permission request result: $result");
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    _appLifecycleState = state;
   }
 
   void _setupFCMListeners() {
@@ -151,6 +310,27 @@ class _MyHomePageState extends State<MyHomePage> {
         if (message.data.isNotEmpty) {
           _handlePush(message.data);
         }
+      }
+    });
+
+    // Listen to CallKit Incoming events
+    FlutterCallkitIncoming.onEvent.listen((event) async {
+      if (event == null) return;
+
+      if (event.event == Event.actionCallDecline) {
+        debugPrint("Call Declined");
+        final callId = event.body['id'] as String?;
+        if (callId != null) {
+          try {
+            await AgoraChatCallManager.hangup(callId);
+          } catch (e) {
+            debugPrint("Hangup error: $e");
+          }
+        }
+        await FlutterCallkitIncoming.endCall(event.body['id']);
+      } else {
+        // Reuse handler for other events like accept
+        _handleCallKitEvent(event);
       }
     });
   }
@@ -213,7 +393,29 @@ class _MyHomePageState extends State<MyHomePage> {
       final chatToken = await TokenService().fetchChatToken(userId);
 
       // 2. Login with fetched token
-      await ChatUIKit.instance.loginWithToken(userId: userId, token: chatToken);
+      // Check if already logged in first to avoid error 200
+      bool isLoggedIn = await ChatClient.getInstance.isConnected();
+      if (!isLoggedIn) {
+        try {
+          await ChatUIKit.instance.loginWithToken(
+            userId: userId,
+            token: chatToken,
+          );
+        } on agora_sdk.ChatError catch (e) {
+          // Error 200 means already logged in. Treat as success.
+          if (e.code == 200) {
+            debugPrint("User already logged in (Error 200). Proceeding.");
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        debugPrint("User already logged in (isConnected=true). Proceeding.");
+      }
+
+      // Save valid login
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_user_id', userId);
 
       // 3. Configure FCM
       try {
@@ -273,7 +475,17 @@ class _MyHomePageState extends State<MyHomePage> {
         _isLoading = false;
       });
       debugPrint('Login successful');
-      _navigateToConversations();
+
+      if (_pendingNavigationUserId != null) {
+        // Navigate to the pending chat
+        _navigateToChat(_pendingNavigationUserId!, _pendingNavigationUserId!);
+        // Clear it
+        setState(() {
+          _pendingNavigationUserId = null;
+        });
+      } else {
+        _navigateToConversations();
+      }
     } catch (e) {
       debugPrint('login error: $e');
       setState(() => _isLoading = false);
@@ -288,8 +500,13 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _logout() async {
     try {
       await ChatUIKit.instance.logout();
+      // Clear saved login
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('current_user_id');
+
       setState(() {
         _isLoggedIn = false;
+        _pendingNavigationUserId = null;
       });
     } catch (e) {
       debugPrint('logout error: $e');
@@ -302,13 +519,24 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _navigateToChat(String userId, String username) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => ChatPage(userId: userId, username: username),
+      ),
+    );
+  }
+
   void onReceiveCall(
     String userId,
     String callId,
     AgoraChatCallType callType,
     Map<String, String>? ext,
   ) async {
-    pushToCallPage([userId], callType, callId);
+    // Only handle calls if logged in
+    if (_isLoggedIn) {
+      pushToCallPage([userId], callType, callId);
+    }
   }
 
   void pushToCallPage(
@@ -317,7 +545,6 @@ class _MyHomePageState extends State<MyHomePage> {
     String? callId,
   ]) async {
     Widget page;
-
     if (callId == null) {
       page = SingleCallPage.call(userIds.first, type: callType);
     } else {
@@ -343,32 +570,60 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AgoraChatCallManager.removeEventListener("UNIQUE_HANDLER_ID");
     super.dispose();
   }
 
-  void _handlePush(Map<String, dynamic> data) {
+  void _handlePush(Map<String, dynamic> data) async {
     debugPrint("Handling push data: $data");
     if (data.containsKey("callId")) {
       // incoming call
       final String fromUserId = data["f"];
+      final String fromUserName = data["u"] ?? fromUserId;
       final String callId = data["callId"];
-      final callType = data["callType"] == "video"
+      final bool isVideo = data["callType"] == "video";
+      final callType = isVideo
           ? AgoraChatCallType.video_1v1
           : AgoraChatCallType.audio_1v1;
 
-      pushToCallPage([fromUserId], callType, callId);
+      // If app is in background, show CallKit
+      if (_appLifecycleState != AppLifecycleState.resumed) {
+        await _showCallKitIncoming(fromUserId, fromUserName, callId, isVideo);
+        return;
+      }
+
+      if (_isLoggedIn) {
+        pushToCallPage([fromUserId], callType, callId);
+      } else {
+        debugPrint("Not logged in, queuing call logic logic or ignoring");
+      }
       return;
     }
 
     // default = chat message push
     final String fromUserId = data["f"];
-    final String username = data["u"] ?? "";
-    navigatorKey.currentState?.push(
-      MaterialPageRoute(
-        builder: (_) => ChatPage(userId: fromUserId, username: username),
-      ),
-    );
+    final String username =
+        data["u"] ?? ""; // payload usually has 'u' for username
+
+    if (_isLoggedIn) {
+      _navigateToChat(fromUserId, username);
+    } else {
+      // Save for after login
+      debugPrint(
+        "Not logged in. Saving pending chat navigation for $fromUserId",
+      );
+      _pendingNavigationUserId = fromUserId;
+    }
+  }
+
+  Future<void> _showCallKitIncoming(
+    String callerId,
+    String callerName,
+    String callId,
+    bool isVideo,
+  ) async {
+    await _showCallKitIncomingStatic(callerId, callerName, callId, isVideo);
   }
 
   void _setupAgoraChatMessageListener() {
@@ -396,8 +651,42 @@ class _MyHomePageState extends State<MyHomePage> {
 
           // Show local notification for each message
           for (var message in messages) {
-            if (message.body.type == agora_sdk.MessageType.TXT) {
+            bool shouldShow = true;
+            if (_appLifecycleState == AppLifecycleState.resumed) {
+              if (ChatState.currentChatUserId == message.from) {
+                shouldShow = false;
+              }
+            }
+
+            if (shouldShow && message.body.type == agora_sdk.MessageType.TXT) {
               final txtBody = message.body as ChatTextMessageBody;
+
+              // Check if this is a call invite message
+              if (txtBody.content == "invite info: voice" ||
+                  txtBody.content == "invite info: video") {
+                final bool isVideo = txtBody.content.contains("video");
+
+                // Try to find a callId/channelId in attributes
+                // Note: Agora Chat CallKit usually puts details in attributes.
+                // If not available, we use messageId as a fallback unique ID.
+                String callId = message.msgId;
+                if (message.attributes != null &&
+                    message.attributes!.containsKey("callId")) {
+                  callId = message.attributes!["callId"] as String;
+                }
+
+                if (_appLifecycleState != AppLifecycleState.resumed) {
+                  await _showCallKitIncoming(
+                    message.from ?? "Unknown",
+                    message.from ?? "Unknown", // username
+                    callId,
+                    isVideo,
+                  );
+                }
+                // Do NOT show standard local notification for calls
+                continue;
+              }
+
               await _showLocalNotification(
                 title: "New message from ${message.from}",
                 body: txtBody.content,
@@ -415,6 +704,8 @@ class _MyHomePageState extends State<MyHomePage> {
     required String body,
     String? payload,
   }) async {
+    debugPrint("Showing local notification: $title, $body");
+
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
           'chat_messages',

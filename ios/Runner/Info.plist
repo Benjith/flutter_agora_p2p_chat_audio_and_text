@@ -51,5 +51,11 @@
 	<string>We need access to your microphone for voice calls in the chat application</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to share photos in chats</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+		<string>voip</string>
+	</array>
 </dict>
 </plist>

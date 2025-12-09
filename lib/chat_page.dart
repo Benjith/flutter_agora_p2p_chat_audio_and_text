@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:p2p_chat_with_agora_ui_kit/agora_rtc_manager.dart';
 import 'package:p2p_chat_with_agora_ui_kit/call_pages/single_call_page.dart';
 import 'package:p2p_chat_with_agora_ui_kit/constants.dart';
+import 'package:p2p_chat_with_agora_ui_kit/chat_state.dart';
 
 class ChatPage extends StatefulWidget {
   final String userId;
@@ -23,6 +24,7 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    ChatState.currentChatUserId = widget.userId;
     _initializeAgora();
   }
 
@@ -32,6 +34,7 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    ChatState.currentChatUserId = null;
     _agoraManager.dispose();
     super.dispose();
   }
@@ -54,7 +57,6 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _startVoiceCall() async {
     try {
-
       await AgoraChatCallManager.initRTC();
       try {
         // userId: The Agora Chat user ID of the callee.
