@@ -15,6 +15,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:agora_chat_sdk/agora_chat_sdk.dart' as agora_sdk;
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,8 +50,9 @@ Future<void> _showCallKitIncomingStatic(
   String callId,
   bool isVideo,
 ) async {
+  final String callKitId = const Uuid().v4();
   final params = CallKitParams(
-    id: callId,
+    id: callKitId,
     nameCaller: callerName,
     appName: 'P2P Chat',
     avatar: 'https://i.pravatar.cc/100',
@@ -65,7 +67,11 @@ Future<void> _showCallKitIncomingStatic(
       subtitle: 'Missed call',
       callbackText: 'Call back',
     ),
-    extra: <String, dynamic>{'userId': callerId, 'callType': isVideo ? 1 : 0},
+    extra: <String, dynamic>{
+      'userId': callerId,
+      'callType': isVideo ? 1 : 0,
+      'callId': callId, // Store original Agora callId here
+    },
     headers: <String, dynamic>{'apiKey': 'Abc@123!', 'platform': 'flutter'},
     android: const AndroidParams(
       isCustomNotification: true,
@@ -76,7 +82,7 @@ Future<void> _showCallKitIncomingStatic(
       actionColor: '#4CAF50',
     ),
     ios: const IOSParams(
-      iconName: 'AppIcon',
+      iconName: 'CallKitLogo',
       handleType: '',
       supportsVideo: true,
       maximumCallGroups: 2,
@@ -195,7 +201,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         break;
       case Event.actionCallDecline:
         debugPrint("Call Declined (Handler)");
-        final callId = event.body['id'] as String?;
+        final extra = event.body['extra'];
+        String? callId;
+        if (extra != null) {
+          callId = extra['callId'];
+        }
+        // Fallback or if not in extra, try top level (though we generate UUID now)
+        if (callId == null) {
+          callId = event.body['id'] as String?;
+        }
+
         if (callId != null) {
           AgoraChatCallManager.hangup(callId);
         }
@@ -319,7 +334,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
       if (event.event == Event.actionCallDecline) {
         debugPrint("Call Declined");
-        final callId = event.body['id'] as String?;
+        final extra = event.body['extra'];
+        String? callId;
+        if (extra != null) {
+          callId = extra['callId'];
+        }
+
         if (callId != null) {
           try {
             await AgoraChatCallManager.hangup(callId);
