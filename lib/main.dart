@@ -13,10 +13,7 @@ import 'package:p2p_chat_with_agora_ui_kit/token_service.dart';
 import 'package:p2p_chat_with_agora_ui_kit/chat_state.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:agora_chat_sdk/agora_chat_sdk.dart' as agora_sdk;
-import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
-import 'package:flutter_callkit_incoming/entities/entities.dart';
-import 'package:uuid/uuid.dart';
-
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -32,73 +29,68 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   // If it is a call and app is in background (terminated handler)
   if (message.data.containsKey("callId")) {
-    // We can try to show CallKit here if the plugin allows being called from BG handler
-    // Note: On Android, this might work directly. On iOS, typically needs PushKit.
-    // But let's try to handle standard notification triggers.
-    final String fromUserId = message.data["f"];
-    final String fromUserName = message.data["u"] ?? fromUserId;
-    final String callId = message.data["callId"];
-    final bool isVideo = message.data["callType"] == "video";
+    final String fromUserName = message.data["u"] ?? "Unknown";
 
-    await _showCallKitIncomingStatic(fromUserId, fromUserName, callId, isVideo);
+    // Initialize local notifications in background isolate
+    final FlutterLocalNotificationsPlugin flnp =
+        FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings initAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings initIOS = DarwinInitializationSettings();
+    await flnp.initialize(
+      InitializationSettings(android: initAndroid, iOS: initIOS),
+    );
+
+    await _createCallNotificationChannel(flnp);
+
+    // Show Local Notification
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'incoming_calls',
+          'Incoming Calls',
+          channelDescription: 'Notifications for incoming voice/video calls',
+          importance: Importance.max,
+          priority: Priority.high,
+          fullScreenIntent: true,
+          category: AndroidNotificationCategory.call,
+          playSound: true,
+        );
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound:
+          'system_ringtone_default.aiff', // ensure exists or remove for default
+    );
+
+    final payload = jsonEncode({'type': 'call', 'data': message.data});
+
+    await flnp.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'Incoming Call',
+      '$fromUserName is calling...',
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: payload,
+    );
   }
 }
 
-Future<void> _showCallKitIncomingStatic(
-  String callerId,
-  String callerName,
-  String callId,
-  bool isVideo,
+Future<void> _createCallNotificationChannel(
+  FlutterLocalNotificationsPlugin flnp,
 ) async {
-  final String callKitId = const Uuid().v4();
-  final params = CallKitParams(
-    id: callKitId,
-    nameCaller: callerName,
-    appName: 'P2P Chat',
-    avatar: 'https://i.pravatar.cc/100',
-    handle: callerId,
-    type: isVideo ? 1 : 0,
-    duration: 30000,
-    textAccept: 'Accept',
-    textDecline: 'Decline',
-    missedCallNotification: const NotificationParams(
-      showNotification: true,
-      isShowCallback: true,
-      subtitle: 'Missed call',
-      callbackText: 'Call back',
-    ),
-    extra: <String, dynamic>{
-      'userId': callerId,
-      'callType': isVideo ? 1 : 0,
-      'callId': callId, // Store original Agora callId here
-    },
-    headers: <String, dynamic>{'apiKey': 'Abc@123!', 'platform': 'flutter'},
-    android: const AndroidParams(
-      isCustomNotification: true,
-      isShowLogo: false,
-      ringtonePath: 'system_ringtone_default',
-      backgroundColor: '#0955fa',
-      backgroundUrl: 'https://i.pravatar.cc/500',
-      actionColor: '#4CAF50',
-    ),
-    ios: const IOSParams(
-      iconName: 'CallKitLogo',
-      handleType: '',
-      supportsVideo: true,
-      maximumCallGroups: 2,
-      maximumCallsPerCallGroup: 1,
-      audioSessionMode: 'default',
-      audioSessionActive: true,
-      audioSessionPreferredSampleRate: 44100.0,
-      audioSessionPreferredIOBufferDuration: 0.005,
-      supportsDTMF: true,
-      supportsHolding: true,
-      supportsGrouping: false,
-      supportsUngrouping: false,
-      ringtonePath: 'system_ringtone_default',
-    ),
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'incoming_calls', // id
+    'Incoming Calls', // title
+    description: 'Notifications for incoming voice/video calls',
+    importance: Importance.max,
+    playSound: true,
   );
-  await FlutterCallkitIncoming.showCallkitIncoming(params);
+
+  await flnp
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >()
+      ?.createNotificationChannel(channel);
 }
 
 void main() async {
@@ -163,61 +155,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     _setupFCMListeners();
     _setupLocalNotifications();
     _checkAutoLogin();
-    _checkIncomingCallEvents();
-  }
-
-  Future<void> _checkIncomingCallEvents() async {
-    try {
-      final calls = await FlutterCallkitIncoming.activeCalls();
-      if (calls is List) {
-        for (var call in calls) {
-          debugPrint("Active call found on startup: ${call['id']}");
-          // We could potentially navigate here if we know it was accepted
-        }
-      }
-    } catch (e) {
-      debugPrint("Error checking incoming call events: $e");
-    }
-  }
-
-  void _handleCallKitEvent(CallEvent event) {
-    switch (event.event) {
-      case Event.actionCallAccept:
-        debugPrint("Call Accepted: ${event.body}");
-        final extra = event.body['extra'];
-        if (extra != null) {
-          final String userId = extra['userId'];
-          final int callTypeInt = extra['callType'] ?? 0;
-          final callType = callTypeInt == 1
-              ? AgoraChatCallType.video_1v1
-              : AgoraChatCallType.audio_1v1;
-
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(
-              builder: (_) => SingleCallPage.call(userId, type: callType),
-            ),
-          );
-        }
-        break;
-      case Event.actionCallDecline:
-        debugPrint("Call Declined (Handler)");
-        final extra = event.body['extra'];
-        String? callId;
-        if (extra != null) {
-          callId = extra['callId'];
-        }
-        // Fallback or if not in extra, try top level (though we generate UUID now)
-        if (callId == null) {
-          callId = event.body['id'] as String?;
-        }
-
-        if (callId != null) {
-          AgoraChatCallManager.hangup(callId);
-        }
-        break;
-      default:
-        break;
-    }
   }
 
   /// Automatically login if a user ID is saved in shared preferences.
@@ -258,14 +195,45 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         if (response.payload != null) {
-          // Handle notification tap
           debugPrint("Notification tapped with payload: ${response.payload}");
+          try {
+            final data = jsonDecode(response.payload!);
 
-          if (_isLoggedIn) {
-            _navigateToChat(response.payload!, response.payload!);
-          } else {
-            debugPrint("Notification tapped but not logged in. Queueing.");
-            _pendingNavigationUserId = response.payload;
+            if (data is Map && data['type'] == 'call') {
+              final callData = data['data'];
+              final String fromUserId = callData["f"];
+              final bool isVideo = callData["callType"] == "video";
+              final String? callId = callData["callId"];
+
+              final callType = isVideo
+                  ? AgoraChatCallType.video_1v1
+                  : AgoraChatCallType.audio_1v1;
+
+              if (_isLoggedIn) {
+                debugPrint(
+                  "Call notification tapped. Let Agora SDK handle UI.",
+                );
+                // pushToCallPage([fromUserId], callType, callId); // REMOVED per user request
+              } else {
+                debugPrint(
+                  "Not logged in. App open will trigger auto-login and Agora listeners.",
+                );
+              }
+              return;
+            } else {
+              // Chat message
+              if (_isLoggedIn) {
+                _navigateToChat(response.payload!, response.payload!);
+              } else {
+                debugPrint("Notification tapped but not logged in. Queueing.");
+                _pendingNavigationUserId = response.payload;
+              }
+            }
+          } catch (e) {
+            // Fallback for plain string payloads (old logic)
+            if (_isLoggedIn) {
+              _navigateToChat(response.payload!, response.payload!);
+            }
           }
         }
       },
@@ -325,32 +293,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         if (message.data.isNotEmpty) {
           _handlePush(message.data);
         }
-      }
-    });
-
-    // Listen to CallKit Incoming events
-    FlutterCallkitIncoming.onEvent.listen((event) async {
-      if (event == null) return;
-
-      if (event.event == Event.actionCallDecline) {
-        debugPrint("Call Declined");
-        final extra = event.body['extra'];
-        String? callId;
-        if (extra != null) {
-          callId = extra['callId'];
-        }
-
-        if (callId != null) {
-          try {
-            await AgoraChatCallManager.hangup(callId);
-          } catch (e) {
-            debugPrint("Hangup error: $e");
-          }
-        }
-        await FlutterCallkitIncoming.endCall(event.body['id']);
-      } else {
-        // Reuse handler for other events like accept
-        _handleCallKitEvent(event);
       }
     });
   }
@@ -607,9 +549,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           ? AgoraChatCallType.video_1v1
           : AgoraChatCallType.audio_1v1;
 
-      // If app is in background, show CallKit
+      // If app is in background, show Local Notification
       if (_appLifecycleState != AppLifecycleState.resumed) {
-        await _showCallKitIncoming(fromUserId, fromUserName, callId, isVideo);
+        await _showLocalNotificationCall(fromUserName, data);
         return;
       }
 
@@ -635,15 +577,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       );
       _pendingNavigationUserId = fromUserId;
     }
-  }
-
-  Future<void> _showCallKitIncoming(
-    String callerId,
-    String callerName,
-    String callId,
-    bool isVideo,
-  ) async {
-    await _showCallKitIncomingStatic(callerId, callerName, callId, isVideo);
   }
 
   void _setupAgoraChatMessageListener() {
@@ -696,11 +629,15 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 }
 
                 if (_appLifecycleState != AppLifecycleState.resumed) {
-                  await _showCallKitIncoming(
+                  final Map<String, dynamic> data = {
+                    'f': message.from,
+                    'u': message.from,
+                    'callId': callId,
+                    'callType': isVideo ? 'video' : 'voice',
+                  };
+                  await _showLocalNotificationCall(
                     message.from ?? "Unknown",
-                    message.from ?? "Unknown", // username
-                    callId,
-                    isVideo,
+                    data,
                   );
                 }
                 // Do NOT show standard local notification for calls
@@ -752,6 +689,39 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       title,
       body,
       notificationDetails,
+      payload: payload,
+    );
+  }
+
+  Future<void> _showLocalNotificationCall(
+    String fromUserName,
+    Map<String, dynamic> data,
+  ) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'incoming_calls',
+          'Incoming Calls',
+          channelDescription: 'Notifications for incoming voice/video calls',
+          importance: Importance.max,
+          priority: Priority.high,
+          fullScreenIntent: true,
+          category: AndroidNotificationCategory.call,
+          playSound: true,
+        );
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      sound: 'system_ringtone_default.aiff',
+    );
+
+    final payload = jsonEncode({'type': 'call', 'data': data});
+
+    await flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000 + 1, // distinct ID
+      'Incoming Call',
+      '$fromUserName is calling...',
+      NotificationDetails(android: androidDetails, iOS: iosDetails),
       payload: payload,
     );
   }
