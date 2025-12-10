@@ -29,7 +29,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   // If it is a call and app is in background (terminated handler)
   if (message.data.containsKey("callId")) {
-    final String fromUserName = message.data["u"] ?? "Unknown";
+    final String callId = message.data["callId"];
+    final String action =
+        message.data["action"] ?? "invite"; // invite or cancel
 
     // Initialize local notifications in background isolate
     final FlutterLocalNotificationsPlugin flnp =
@@ -40,6 +42,24 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await flnp.initialize(
       InitializationSettings(android: initAndroid, iOS: initIOS),
     );
+
+    if (action == 'cancel') {
+      // Dismiss notification
+      await flnp.cancel(callId.hashCode);
+
+      // Mark call as inactive in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('call_active_$callId', false);
+
+      debugPrint("Call cancelled in background: $callId");
+      return;
+    }
+
+    // Mark call as active
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('call_active_$callId', true);
+
+    final String fromUserName = message.data["u"] ?? "Unknown";
 
     await _createCallNotificationChannel(flnp);
 
@@ -66,7 +86,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final payload = jsonEncode({'type': 'call', 'data': message.data});
 
     await flnp.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      callId.hashCode, // Use deterministic ID
       'Incoming Call',
       '$fromUserName is calling...',
       NotificationDetails(android: androidDetails, iOS: iosDetails),
@@ -193,7 +213,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
+      onDidReceiveNotificationResponse: (NotificationResponse response) async {
         if (response.payload != null) {
           debugPrint("Notification tapped with payload: ${response.payload}");
           try {
@@ -210,9 +230,30 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                   : AgoraChatCallType.audio_1v1;
 
               if (_isLoggedIn) {
-                debugPrint(
-                  "Call notification tapped. Let Agora SDK handle UI.",
-                );
+                debugPrint("Call notification tapped. Checking validity...");
+
+                // Guard: Check if call is still active
+                if (callId != null) {
+                  final prefs = await SharedPreferences.getInstance();
+                  final bool isActive =
+                      prefs.getBool('call_active_$callId') ??
+                      true; // Default true if unknown, but better to be strict?
+                  // Actually default true is risky if we missed the start, but default false is risky if we missed the write.
+                  // Let's assume if we have the notification, it started.
+
+                  if (!isActive) {
+                    debugPrint(
+                      "Call $callId is no longer active. Ignoring tap.",
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Call ended')),
+                      );
+                    }
+                    return;
+                  }
+                }
+
                 // pushToCallPage([fromUserId], callType, callId); // REMOVED per user request
               } else {
                 debugPrint(
@@ -425,6 +466,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             // try {
             //   if (callId != null) await AgoraChatCallManager.releaseRTC();
             // } catch (e) {}
+
+            if (callId != null) {
+              await flutterLocalNotificationsPlugin.cancel(callId.hashCode);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('call_active_$callId', false);
+            }
           },
         ),
       );
@@ -548,6 +595,20 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final callType = isVideo
           ? AgoraChatCallType.video_1v1
           : AgoraChatCallType.audio_1v1;
+
+      final String action = data["action"] ?? "invite";
+
+      if (action == 'cancel') {
+        await flutterLocalNotificationsPlugin.cancel(callId.hashCode);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('call_active_$callId', false);
+        debugPrint("Call cancelled in foreground/background push: $callId");
+        return;
+      }
+
+      // Mark active
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('call_active_$callId', true);
 
       // If app is in background, show Local Notification
       if (_appLifecycleState != AppLifecycleState.resumed) {
@@ -718,7 +779,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     final payload = jsonEncode({'type': 'call', 'data': data});
 
     await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000 + 1, // distinct ID
+      data['callId'].hashCode, // distinct ID
       'Incoming Call',
       '$fromUserName is calling...',
       NotificationDetails(android: androidDetails, iOS: iosDetails),
